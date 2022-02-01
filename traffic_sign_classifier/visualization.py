@@ -1,3 +1,9 @@
+""" Image grid visualization tools
+@author Wajih Ouertani
+@email wajih.ouertani@gmail.com
+"""
+
+import os
 from typing import Dict, Iterable, List, Optional
 
 import numpy as np
@@ -6,6 +12,15 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import ImageGrid
 
 from traffic_sign_classifier.utils import group_by_category
+
+
+def show_image(ax, image: np.ndarray, title: Optional[str] = None):
+    """a helper to show/plot image in a subplot (AxesSubplot)"""
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    ax.imshow(image)
+    if title:
+        ax.set_title(f"{title}", pad=-2)
 
 
 def grid_visu(
@@ -17,6 +32,8 @@ def grid_visu(
     label_to_name: Optional[Dict[int, str]] = None,
     shuffle: bool = False,
     categories_per_fig: int = 5,  # number of category per figure
+    output_dir_path=None,
+    output_ext="jpg",
 ):
     """Visualize dataset/images sample (from the dataset) in a grid
 
@@ -29,14 +46,12 @@ def grid_visu(
     :param categories_per_fig: the number of categories to show/display per-figure (to better load/render)
     """
 
-    def show_image(ax, image: np.ndarray, title: Optional[str] = None):
-        """a helper to show/plot image in a subplot (AxesSubplot)"""
-        if idx is not None:
-            ax.get_xaxis().set_visible(False)
-            ax.get_yaxis().set_visible(False)
-            ax.imshow(image)
-            if title:
-                ax.set_title(f"{title}", pad=-2)
+    def gen_preview_output_file(index: int) -> str:
+        """Generate output file for a group of categories"""
+        output_file_path = ".".join(["_".join(["preview", str(index)]), output_ext])
+        return os.path.join(output_dir_path, output_file_path)
+
+    # todo ensure output_dir is created to contain all the preview if it is not none
 
     # Group the images by category/class
     by_category = group_by_category(labels, sample_size=sample_size, shuffle=shuffle)
@@ -52,11 +67,13 @@ def grid_visu(
     if not label_to_name:
         label_to_name = {}
 
-    # group categories in separate figures (seemd loading faster)
-    for grp in [
-        sorted_categories[i : i + categories_per_fig]
-        for i in range(0, len(sorted_categories), categories_per_fig)
-    ]:
+    # group categories in separate figures (loading faster)
+    for index, grp in enumerate(
+        [
+            sorted_categories[i : i + categories_per_fig]
+            for i in range(0, len(sorted_categories), categories_per_fig)
+        ]
+    ):
         subfigs = plt.figure(
             # constrained_layout=True,
             figsize=(2 * sample_size, 2 * len(grp)),
@@ -66,7 +83,6 @@ def grid_visu(
             subfigs = [subfigs]
 
         for category, fig in zip(grp, subfigs):
-            # TODO: dynamically reshape the grid
             grid = ImageGrid(
                 fig,
                 111,
@@ -80,6 +96,17 @@ def grid_visu(
                         title = prediction_labels[idx]
                     show_image(ax, images[idx], title)
             fig.suptitle(
-                f"categ {category}:{label_to_name.get(category, category)}",
+                f"(class {category})  {label_to_name.get(category, category)}",
                 fontsize="large",
             )
+        # Saving the preview
+        if output_dir_path is not None:
+            # Ensure that output directory exists if not create it
+            if not os.path.exists(output_dir_path):
+                # Create the directory
+                os.mkdir(output_dir_path)
+
+            if os.path.isdir(output_dir_path):
+                plt.savefig(gen_preview_output_file(index))
+            else:
+                """TODO: log saving error if the output_dir_path does not exist or could not be created"""
