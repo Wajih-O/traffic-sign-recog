@@ -1,3 +1,8 @@
+""" LeNet Tensorflow 2.7.x implementation
+@author Wajih Ouertani
+@email wajih.ouertani@gmail.com
+"""
+
 from re import L
 from typing import List, Optional
 
@@ -91,6 +96,7 @@ class LeNet:
         logits=True,
         preprocessing_layers: Optional[list] = None,
         augmentation_layers: Optional[list] = None,
+        name="UNNAMED",
     ):
         """Initialize network parameters"""
         self.categ_nbr = categ_nbr
@@ -105,6 +111,7 @@ class LeNet:
 
         self._train_model = None
         self._pred_model = None
+        self._name = name
 
     @property
     def model(self):
@@ -133,7 +140,9 @@ class LeNet:
                 input_,
                 self.preprocessing_layers + self.augmentation_layers + self.layers,
             ),
+            name=f"{self._name}.training",
         )
+
         # building prediction model
         self._pred_model = Model(
             input_,
@@ -146,6 +155,7 @@ class LeNet:
                     )
                 ),
             ),
+            name=f"{self._name}.prediction",
         )
 
     def _loss(self):
