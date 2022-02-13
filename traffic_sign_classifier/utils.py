@@ -36,6 +36,17 @@ def group_by_category(
     return idx_by_category
 
 
+def accuracy_classes(prediction: np.ndarray, gt: np.ndarray):
+    """Calculate accuracy from classes/categories prediction array (1D)"""
+    assert len(prediction) == len(gt)
+    return float(np.sum(prediction == gt)) / len(gt)
+
+
+def accuracy(prediction, gt):
+    """Calculate accuracy from logits (or softmax output) predictions"""
+    return accuracy_classes(np.argmax(prediction, axis=1), gt)
+
+
 def inspect_prediction(model, input_images, ground_truth) -> np.ndarray:
     """Inspect prediction
     :param model: trained model
@@ -55,7 +66,7 @@ def stack_pixels(pixel_channel_array, width=32, height=32):
 
 def channel_min_max_normalizer(image_dataset: np.ndarray):
     """(local) min-max normalizer (equalizer)
-    :param image_dataset:  numpy array with shape [N, width, height, channels_nbr] where N is the size of the image datatset
+    :param image_dataset:  numpy array with shape [N, width, height, channels_nbr] where N is the size of the image dataset
 
     """
     image_min = stack_pixels(np.min(image_dataset, axis=(1, 2))).astype(float)
