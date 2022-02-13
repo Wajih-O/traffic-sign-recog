@@ -4,10 +4,12 @@
 """
 
 from re import L
-from typing import List, Optional
+from typing import List, Optional, Tuple, Dict
 
 import numpy as np
 import tensorflow as tf
+from cv2 import batchDistance
+from pydantic import BaseModel
 from tensorflow.keras import Model
 from tensorflow.keras.layers import (
     Input,
@@ -42,6 +44,13 @@ def load_layers(layers: Optional[list] = None):
     return []
 
 
+class ConvLayerConfig(BaseModel):
+    """A layer filter config (lite) a helper class to configure a layer filter."""
+
+    filters: int
+    kernel_size: Tuple[int, int] = (5, 5)  # default kernel size set to (5, 5)
+
+
 class LeNet:
 
     """Tensorflow 2.x implementation of leNet architecture"""
@@ -55,13 +64,15 @@ class LeNet:
             Architecture:
                 Conv. layers:
                     - Conv. layer 1: The output shape should be 28x28x6. + (default: ReLU activation)
+                    - (optional batch normalization not orig.)
                     - Pooling 1: The output shape should be 14x14x6.
 
                     - Conv. Layer 2: The output shape should be 10x10x16.  + (default: ReLU activation)
+                    - (optional batch normalization not orig.)
                     - Pooling 2: The output shape should be 5x5x16.
 
                     - Flatten: Flatten the output shape of the final pooling layer
-
+                    - (optional dropout - not orig.)
                 Fully connected layers:
                     - Layer 4: Fully Connected (default: Relu activation)
                     - Layer 3: Fully Connected (default: Relu activation)
@@ -70,23 +81,43 @@ class LeNet:
         """
         self.layers = [
             Conv2D(
-                6, kernel_size=(5, 5), padding="valid", activation=self.conv_activation
-            ),
-            BatchNormalization(),
-            MaxPooling2D(pool_size=(2, 2), strides=(2, 2)),
-            Conv2D(
-                16, kernel_size=(5, 5), padding="valid", activation=self.conv_activation
-            ),
-            BatchNormalization(),
-            MaxPooling2D(pool_size=(2, 2), strides=(2, 2)),
-            Flatten(),
-            Dropout(0.3),
-            Dense(120, activation=self.fcn_activation),
-            Dense(84, activation=self.fcn_activation),
-            Dense(self.categ_nbr)
-            if self.logits
-            else Dense(self.categ_nbr, activation="softmax"),
+                **self.conv_layers_config.get(
+                    1, ConvLayerConfig(filters=6, kernel_size=(5, 5))
+                ).dict(),
+                padding="valid",
+                activation=self.conv_activation,
+            )
         ]
+        if self._batch_norm:
+            self.layers.append(BatchNormalization())
+
+        self.layers.extend(
+            [
+                MaxPooling2D(pool_size=(2, 2), strides=(2, 2)),
+                Conv2D(
+                    **self.conv_layers_config.get(
+                        2, ConvLayerConfig(filters=16, kernel_size=(5, 5))
+                    ).dict(),
+                    padding="valid",
+                    activation=self.conv_activation,
+                ),
+            ]
+        )
+
+        if self._batch_norm:
+            self.layers.append(BatchNormalization())
+        self.layers.extend([MaxPooling2D(pool_size=(2, 2), strides=(2, 2)), Flatten()])
+        if self._dropout:
+            self.layers.append(Dropout(self._dropout))
+        self.layers.extend(
+            [
+                Dense(120, activation=self.fcn_activation),
+                Dense(84, activation=self.fcn_activation),
+                Dense(self.categ_nbr)
+                if self.logits
+                else Dense(self.categ_nbr, activation="softmax"),
+            ]
+        )
 
     def __init__(
         self,
@@ -96,7 +127,10 @@ class LeNet:
         logits=True,
         preprocessing_layers: Optional[list] = None,
         augmentation_layers: Optional[list] = None,
+        conv_layers_config: Optional[Dict[int, ConvLayerConfig]] = None,
         name="UNNAMED",
+        batch_norm=True,
+        dropout: float = 0.2,
     ):
         """Initialize network parameters"""
         self.categ_nbr = categ_nbr
@@ -107,11 +141,26 @@ class LeNet:
         self.preprocessing_layers = load_layers(preprocessing_layers)
         self.augmentation_layers = load_layers(augmentation_layers)
 
+        #  default convolution layers config (we have 2 layers)
+        self.conv_layers_config: Dict[int, ConvLayerConfig] = {
+            1: ConvLayerConfig(filters=6, kernel_size=(5, 5)),
+            2: ConvLayerConfig(filters=16, kernel_size=(5, 5)),
+        }
+        if conv_layers_config is not None:
+            self.conv_layers_config.update(conv_layers_config)
+
+        self._batch_norm = batch_norm
+        self._dropout = dropout
+
         self.__init_layers()
 
         self._train_model = None
         self._pred_model = None
         self._name = name
+
+    @property
+    def name(self):
+        return self._name
 
     @property
     def model(self):
