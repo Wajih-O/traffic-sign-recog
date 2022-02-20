@@ -1,5 +1,5 @@
-
 import numpy as np
+
 
 def softmax(logits):
     """A helper that computes softmax"""

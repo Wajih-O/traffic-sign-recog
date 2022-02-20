@@ -4,7 +4,7 @@
 """
 
 from re import L
-from typing import List, Optional, Tuple, Dict
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -12,13 +12,13 @@ from cv2 import batchDistance
 from pydantic import BaseModel
 from tensorflow.keras import Model
 from tensorflow.keras.layers import (
-    Input,
-    Flatten,
-    Conv2D,
-    MaxPooling2D,
-    Dense,
     BatchNormalization,
+    Conv2D,
+    Dense,
     Dropout,
+    Flatten,
+    Input,
+    MaxPooling2D,
 )
 from tensorflow.keras.losses import CategoricalCrossentropy
 from tensorflow.keras.optimizers import Optimizer
@@ -173,7 +173,7 @@ class LeNet:
             input_,
             self.output(
                 input_,
-                self.preprocessing_layers + self.augmentation_layers + self.layers,
+                self.augmentation_layers + self.preprocessing_layers + self.layers,
             ),
             name=f"{self._name}.training",
         )
