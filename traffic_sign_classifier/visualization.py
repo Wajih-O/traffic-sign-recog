@@ -14,13 +14,21 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 from traffic_sign_classifier.utils import group_by_category
 
 
-def show_image(ax, image: np.ndarray, title: Optional[str] = None):
+def show_image(ax, image: np.ndarray, title: Optional[str] = None, **kwargs):
     """a helper to show/plot image in a subplot (AxesSubplot)"""
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
-    ax.imshow(image)
+    ax.imshow(image, **kwargs)
     if title:
         ax.set_title(f"{title}", pad=-2)
+
+
+def gen_preview_output_file(
+    index: int, output_dir_path: str, output_ext: str = "jpg"
+) -> str:
+    """Generate output file for a group of categories"""
+    output_file_path = ".".join(["_".join(["preview", str(index)]), output_ext])
+    return os.path.join(output_dir_path, output_file_path)
 
 
 def grid_visu(
@@ -32,8 +40,8 @@ def grid_visu(
     label_to_name: Optional[Dict[int, str]] = None,
     shuffle: bool = False,
     categories_per_fig: int = 5,  # number of category per figure
-    output_dir_path=None,
-    output_ext="jpg",
+    output_dir_path: Optional[str] = None,
+    output_ext: str = "jpg",
 ):
     """Visualize dataset/images sample (from the dataset) in a grid
 
@@ -46,12 +54,7 @@ def grid_visu(
     :param categories_per_fig: the number of categories to show/display per-figure (to better load/render)
     """
 
-    def gen_preview_output_file(index: int) -> str:
-        """Generate output file for a group of categories"""
-        output_file_path = ".".join(["_".join(["preview", str(index)]), output_ext])
-        return os.path.join(output_dir_path, output_file_path)
-
-    # todo ensure output_dir is created to contain all the preview if it is not none
+    # TODO: ensure output_dir is a direcotry to contain all the preview if it is not none
 
     # Group the images by category/class
     by_category = group_by_category(labels, sample_size=sample_size, shuffle=shuffle)
@@ -107,6 +110,10 @@ def grid_visu(
                 os.mkdir(output_dir_path)
 
             if os.path.isdir(output_dir_path):
-                plt.savefig(gen_preview_output_file(index))
+                plt.savefig(
+                    gen_preview_output_file(
+                        index, output_dir_path, output_ext=output_ext
+                    )
+                )
             else:
                 """TODO: log saving error if the output_dir_path does not exist or could not be created"""
