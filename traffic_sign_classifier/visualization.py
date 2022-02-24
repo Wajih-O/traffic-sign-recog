@@ -4,6 +4,7 @@
 """
 
 import os
+from collections import defaultdict
 from typing import Dict, Iterable, List, Optional
 
 import numpy as np
@@ -114,6 +115,79 @@ def grid_visu(
                     gen_preview_output_file(
                         index, output_dir_path, output_ext=output_ext
                     )
+                )
+            else:
+                """TODO: log saving error if the output_dir_path does not exist or could not be created"""
+
+
+def visualize_feature_map_output(
+    images,
+    activation_model,
+    layer_label,
+    images_per_figure=5,
+    output_dir_path: Optional[str] = None,
+    output_ext: str = "jpg",
+):
+    """Visualize the feature map output
+
+    :param images: images np.array to be fed to the network (for which the feature map will be produced)
+    :param model: prediction model
+    :param layer_name: layer_name as the selector for the layer output/feature map to be visualized
+    :param images_per_figure: the number of image to group by figure
+
+    """
+
+    activation_output = activation_model.predict(np.array(images)).transpose(0, 3, 1, 2)
+
+    # TODO group per category instead of the images per figure
+
+    feature_map_nbr = activation_output.shape[1]
+    offset = 0
+    for idx, grp in enumerate(
+        [
+            activation_output[i : i + images_per_figure]
+            for i in range(0, activation_output.shape[0], images_per_figure)
+        ]
+    ):
+        subfigs = plt.figure(
+            # constrained_layout=True,
+            figsize=(2 * grp.shape[1], 2 * len(grp)),
+            tight_layout=False,
+        ).subfigures(grp.shape[0], 1, wspace=0.01)
+
+        if not isinstance(subfigs, Iterable):
+            subfigs = [subfigs]
+
+        for image_idx, ft_map, fig in zip(range(grp.shape[0]), grp, subfigs):
+            grid = ImageGrid(
+                fig,
+                111,
+                nrows_ncols=(1, feature_map_nbr),
+                axes_pad=0.4,
+            )
+            for ax, ft_map_idx in zip(grid, range(ft_map.shape[0])):
+                title = f"FeatureMap {ft_map_idx}"
+                # print("ft_map",  ft_map[idx].shape)
+                if idx is not None:
+                    show_image(ax, ft_map[ft_map_idx], title, cmap="plasma")
+
+            fig.suptitle(
+                f"layer: {layer_label}, image: {offset + image_idx} ",
+                fontsize="large",
+            )
+        # TODO add original image to the visualization and
+        offset += len(grp)
+
+        # Saving the preview
+        if output_dir_path is not None:
+            # Ensure that output directory exists if not create it
+            if not os.path.exists(output_dir_path):
+                # Create the directory
+                os.mkdir(output_dir_path)
+
+            if os.path.isdir(output_dir_path):
+                plt.savefig(
+                    gen_preview_output_file(idx, output_dir_path, output_ext=output_ext)
                 )
             else:
                 """TODO: log saving error if the output_dir_path does not exist or could not be created"""
