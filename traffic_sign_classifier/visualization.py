@@ -2,10 +2,11 @@
 @author Wajih Ouertani
 @email wajih.ouertani@gmail.com
 """
+import logging
 
 import os
 from collections import defaultdict
-from typing import Dict, Iterable, List, Optional
+from typing import Callable, Dict, Iterable, List, Optional, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -13,6 +14,8 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import ImageGrid
 
 from traffic_sign_classifier.utils import group_by_category
+
+LOGGER = logging.getLogger()
 
 
 def show_image(ax, image: np.ndarray, title: Optional[str] = None, **kwargs):
@@ -25,10 +28,10 @@ def show_image(ax, image: np.ndarray, title: Optional[str] = None, **kwargs):
 
 
 def gen_preview_output_file(
-    index: int, output_dir_path: str, output_ext: str = "jpg"
+    label: Union[int, str], output_dir_path: str, output_ext: str = "jpg"
 ) -> str:
     """Generate output file for a group of categories"""
-    output_file_path = ".".join(["_".join(["preview", str(index)]), output_ext])
+    output_file_path = ".".join(["_".join(["preview", str(label)]), output_ext])
     return os.path.join(output_dir_path, output_file_path)
 
 
@@ -117,38 +120,43 @@ def grid_visu(
                     )
                 )
             else:
-                """TODO: log saving error if the output_dir_path does not exist or could not be created"""
+                LOGGER.warning(f"{output_dir_path} exists and is not a directory")
 
 
 def visualize_feature_map_output(
     images,
+    paths: List[str],
     activation_model,
     layer_label,
-    images_per_figure=5,
     output_dir_path: Optional[str] = None,
     output_ext: str = "jpg",
+    path_labeler=Callable[[str], int],
+    class2label: Optional[Dict] = None,
 ):
     """Visualize the feature map output
 
     :param images: images np.array to be fed to the network (for which the feature map will be produced)
-    :param model: prediction model
-    :param layer_name: layer_name as the selector for the layer output/feature map to be visualized
+    :param paths: images paths
+    :param activation_model: activation model
+    :param layer_label: layer_name as the selector for the layer output/feature map to be visualized
     :param images_per_figure: the number of image to group by figure
 
     """
+    # Sanity check
+    assert len(paths) == len(images)
+
+    # Building the group by paths/labeler
+    grouped = defaultdict(lambda: [])
+    for idx, label in zip(range(len(paths)), map(path_labeler, paths)):
+        grouped[label].append(idx)
 
     activation_output = activation_model.predict(np.array(images)).transpose(0, 3, 1, 2)
 
-    # TODO group per category instead of the images per figure
-
+    # Group activation map images by category
     feature_map_nbr = activation_output.shape[1]
     offset = 0
-    for idx, grp in enumerate(
-        [
-            activation_output[i : i + images_per_figure]
-            for i in range(0, activation_output.shape[0], images_per_figure)
-        ]
-    ):
+    for category, items in grouped.items():
+        grp = activation_output[items]
         subfigs = plt.figure(
             # constrained_layout=True,
             figsize=(2 * grp.shape[1], 2 * len(grp)),
@@ -158,7 +166,7 @@ def visualize_feature_map_output(
         if not isinstance(subfigs, Iterable):
             subfigs = [subfigs]
 
-        for image_idx, ft_map, fig in zip(range(grp.shape[0]), grp, subfigs):
+        for image_idx, ft_map, fig in zip(items, grp, subfigs):
             grid = ImageGrid(
                 fig,
                 111,
@@ -167,12 +175,13 @@ def visualize_feature_map_output(
             )
             for ax, ft_map_idx in zip(grid, range(ft_map.shape[0])):
                 title = f"FeatureMap {ft_map_idx}"
-                # print("ft_map",  ft_map[idx].shape)
-                if idx is not None:
-                    show_image(ax, ft_map[ft_map_idx], title, cmap="plasma")
+                show_image(ax, ft_map[ft_map_idx], title, cmap="plasma")
 
+            category_label = category
+            if class2label is not None and category in class2label:
+                category_label = f"(class-{category}) {class2label[category]}"
             fig.suptitle(
-                f"layer: {layer_label}, image: {offset + image_idx} ",
+                f"layer: {layer_label}, category: {category_label}, image: {paths[image_idx]} ",
                 fontsize="large",
             )
         # TODO add original image to the visualization and
@@ -187,7 +196,11 @@ def visualize_feature_map_output(
 
             if os.path.isdir(output_dir_path):
                 plt.savefig(
-                    gen_preview_output_file(idx, output_dir_path, output_ext=output_ext)
+                    gen_preview_output_file(
+                        f"{layer_label}_{category}",
+                        output_dir_path,
+                        output_ext=output_ext,
+                    )
                 )
             else:
-                """TODO: log saving error if the output_dir_path does not exist or could not be created"""
+                LOGGER.warning(f"{output_dir_path} exists and is not a directory")
